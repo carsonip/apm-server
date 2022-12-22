@@ -271,6 +271,7 @@ gofmt: $(GOIMPORTS) add-headers
 MODULE_DEPS=$(sort $(shell \
   $(GO) list -deps -tags=darwin,linux,windows -f "{{with .Module}}{{if not .Main}}{{.Path}}{{end}}{{end}}" ./x-pack/apm-server))
 
+.PHONY: notice NOTICE.txt
 notice: NOTICE.txt
 NOTICE.txt build/dependencies-$(APM_SERVER_VERSION).csv: go.mod tools/go.mod
 	$(GO) list -m -json $(MODULE_DEPS) | go run -modfile=tools/go.mod go.elastic.co/go-licence-detector \
