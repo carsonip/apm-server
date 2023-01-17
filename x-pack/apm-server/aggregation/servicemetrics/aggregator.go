@@ -419,6 +419,10 @@ func makeServiceMetrics(event *model.APMEvent) serviceMetrics {
 }
 
 func makeMetricset(key aggregationKey, metrics serviceMetrics, totalCount int64, counts []int64, values []float64, interval string) model.APMEvent {
+	metricsetNameSuffix := ""
+	if interval != "1m" {
+		metricsetNameSuffix = ".internal"
+	}
 	metricCount := int64(math.Round(metrics.transactionCount))
 	return model.APMEvent{
 		Timestamp: key.timestamp,
@@ -434,7 +438,7 @@ func makeMetricset(key aggregationKey, metrics serviceMetrics, totalCount int64,
 		Processor:     model.MetricsetProcessor,
 		Metricset: &model.Metricset{
 			DocCount: totalCount,
-			Name:     metricsetName,
+			Name:     metricsetName + metricsetNameSuffix,
 			Interval: interval,
 		},
 		Transaction: &model.Transaction{

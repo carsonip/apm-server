@@ -264,6 +264,10 @@ func makeAggregationKey(event *model.APMEvent, interval time.Duration) aggregati
 }
 
 func makeMetricset(key aggregationKey, interval string) model.APMEvent {
+	metricsetNameSuffix := ""
+	if interval != "1m" {
+		metricsetNameSuffix = ".internal"
+	}
 	return model.APMEvent{
 		Timestamp: key.timestamp,
 		Service: model.Service{
@@ -277,7 +281,7 @@ func makeMetricset(key aggregationKey, interval string) model.APMEvent {
 		NumericLabels: key.NumericLabels,
 		Processor:     model.MetricsetProcessor,
 		Metricset: &model.Metricset{
-			Name:     metricsetName,
+			Name:     metricsetName + metricsetNameSuffix,
 			Interval: interval,
 		},
 	}

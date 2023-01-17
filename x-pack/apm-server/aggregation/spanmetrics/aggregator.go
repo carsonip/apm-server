@@ -219,7 +219,7 @@ func (a *Aggregator) processSpan(event *model.APMEvent, b *model.Batch) {
 			interval,
 		)
 		if !a.active[interval].storeOrUpdate(key, metrics, a.config.Logger) {
-			*b = append(*b, makeMetricset(key, metrics))
+			*b = append(*b, makeMetricset(key, metrics, ""))
 		}
 	}
 }
@@ -251,7 +251,7 @@ func (a *Aggregator) processDroppedSpanStats(event *model.APMEvent, dss model.Dr
 			interval,
 		)
 		if !a.active[interval].storeOrUpdate(key, metrics, a.config.Logger) {
-			*b = append(*b, makeMetricset(key, metrics))
+			*b = append(*b, makeMetricset(key, metrics, ""))
 		}
 	}
 }
@@ -409,7 +409,11 @@ type spanMetrics struct {
 	sum   float64
 }
 
-func makeMetricset(key aggregationKey, metrics spanMetrics) model.APMEvent {
+func makeMetricset(key aggregationKey, metrics spanMetrics, interval string) model.APMEvent {
+	metricsetNameSuffix := ""
+	if interval != "1m" {
+		metricsetNameSuffix = ".internal"
+	}
 	var target *model.ServiceTarget
 	if key.targetName != "" || key.targetType != "" {
 		target = &model.ServiceTarget{
@@ -432,7 +436,7 @@ func makeMetricset(key aggregationKey, metrics spanMetrics) model.APMEvent {
 		},
 		Processor: model.MetricsetProcessor,
 		Metricset: &model.Metricset{
-			Name:     metricsetName,
+			Name:     metricsetName + metricsetNameSuffix,
 			DocCount: int64(math.Round(metrics.count)),
 		},
 		Span: &model.Span{

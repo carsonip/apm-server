@@ -200,9 +200,7 @@ func (a *Aggregator) publish(ctx context.Context, period time.Duration) error {
 		for hash, entries := range svcEntry.m {
 			for _, entry := range entries {
 				totalCount, counts, values := entry.transactionMetrics.histogramBuckets()
-				event := makeMetricset(entry.transactionAggregationKey, totalCount, counts, values)
-				// Record the metricset interval as metricset.interval.
-				event.Metricset.Interval = intervalStr
+				event := makeMetricset(entry.transactionAggregationKey, totalCount, counts, values, intervalStr)
 				batch = append(batch, event)
 				entry.histogram.Reset()
 			}
@@ -211,9 +209,7 @@ func (a *Aggregator) publish(ctx context.Context, period time.Duration) error {
 		if svcEntry.other != nil {
 			entry := svcEntry.other
 			totalCount, counts, values := entry.transactionMetrics.histogramBuckets()
-			m := makeMetricset(entry.transactionAggregationKey, totalCount, counts, values)
-			// Record the metricset interval as metricset.interval.
-			m.Metricset.Interval = intervalStr
+			m := makeMetricset(entry.transactionAggregationKey, totalCount, counts, values, intervalStr)
 			m.Metricset.Samples = append(m.Metricset.Samples, model.MetricsetSample{
 				Name:  "transaction.aggregation.overflow_count",
 				Value: float64(svcEntry.otherCardinalityEstimator.Estimate()),
@@ -480,8 +476,11 @@ func (a *Aggregator) makeTransactionAggregationKey(event model.APMEvent, interva
 	return key
 }
 
-// makeMetricset makes a metricset event from key, counts, and values, with timestamp ts.
-func makeMetricset(key transactionAggregationKey, totalCount int64, counts []int64, values []float64) model.APMEvent {
+func makeMetricset(key transactionAggregationKey, totalCount int64, counts []int64, values []float64, interval string) model.APMEvent {
+	metricsetNameSuffix := ""
+	if interval != "1m" {
+		metricsetNameSuffix = ".internal"
+	}
 	var eventSuccessCount model.SummaryMetric
 	switch key.eventOutcome {
 	case "success":
@@ -552,8 +551,9 @@ func makeMetricset(key transactionAggregationKey, totalCount int64, counts []int
 		NumericLabels: key.AggregatedGlobalLabels.NumericLabels,
 		Processor:     model.MetricsetProcessor,
 		Metricset: &model.Metricset{
-			Name:     metricsetName,
+			Name:     metricsetName + metricsetNameSuffix,
 			DocCount: totalCount,
+			Interval: interval,
 		},
 		Transaction: &model.Transaction{
 			Name:   key.transactionName,
