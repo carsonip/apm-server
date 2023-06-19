@@ -21,7 +21,7 @@ credentials to run the benchmark against it.
 
 ## Credentials
 
-To successfully use the this environment, you will need to have credentials for:
+To successfully use this environment, you will need to have credentials for:
 
 - An AWS account.
 - ESS or self-serviced ECE environment API key (`EC_API_KEY` environment variable).
@@ -57,7 +57,7 @@ The main commands are:
 
 - `all` (default): runs `auth`, `apmbench`, creates the config files and runs terraform apply.
 - `auth`: Re-generate AWS credentials, they will expire after 4h.
-- `run-benchmark`: Run the benchmarks, can configured by tweaking:
+- `run-benchmark`: Run the benchmarks, can be configured by tweaking:
   - `BENCHMARK_WARMUP_TIME`: Set the amount of time to warm the APM Server for. Defaults to `5m`.
   - `BENCHMARK_AGENTS`: Set the number of agents to send data to the APM Server. Defaults to `64`.
   - `BENCHMARK_COUNT`: Set the number of times each benchmark scenario is run. Defaults to `3`.
@@ -65,6 +65,7 @@ The main commands are:
   - `BENCHMARK_RUN`: Set the expression that matches the benchmark scenarios to run. Defaults to `Benchmark` (all).
   - `BENCHMARK_RESULT`: Set the output file where the results of the benchmark will be written. Defaults to `benchmark-result.txt`
   - `BENCHMARK_DETAILED`: Sets the `-detailed` when running `apmbench`, displaying extra metrics for each benchmark. Defaults to `false`.
+- `run-benchmark-autotuned`: Run the benchmarks but with benchmark settings auto-configured according to APM Server size.
 - `index-benchmark-result`: Indexes `$(BENCHMARK_RESULT)` to an Elasticsearch cluster. Can be configured with:
   - `GOBENCH_INDEX`: Set the Elasticsearch index where the benchmark results will be stored. Defaults to `gobench`.
   - `GOBENCH_USERNAME`: Set the Elasticsearch username to use for authentication. Defaults to `admin`.
@@ -81,7 +82,7 @@ Helper commands
 ### Override the docker image tag
 
 It is possible to override the tag of the docker image that is run in the remote ESS deployment. You can
-specify any of the avilable tags (such as `8.3.0-SNAPSHOT` or a more specific tag `8.3.0-c655cda8-SNAPSHOT`).
+specify any of the available tags (such as `8.3.0-SNAPSHOT` or a more specific tag `8.3.0-c655cda8-SNAPSHOT`).
 Alternatively, you can run evaluate the output of `make docker-override-committed-version` in your shell,
 to have use the committed tags in the `docker-compose.yml` file: `eval $(make docker-override-committed-version)`.
 
@@ -90,6 +91,8 @@ to have use the committed tags in the `docker-compose.yml` file: `eval $(make do
 It is also possible to override the docker image to one that is allowed to run in ESS. For more information
 on which repositories can be used, please refer to our internal docs. To override the docker image, you'll need
 to specify the full object of images that is defined in `variables.tf`: `docker_image_override`.
+
+To build a custom docker image to run on ESS, see [/testing/cloud/README.md](/testing/cloud/README.md).
 
 ### Set APM index shards
 
@@ -106,4 +109,4 @@ the benchmarks without destroying the deployment.
 Reporting data is taken from the https://`<replace-with-kibana-benchmark-url>`/app/dashboards#/view/a5bc8390-2f8e-11ed-a369-052d8245fa04?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-30d,to:now))
 It's possible to add or modify any metric.
 
-Naming convention for mertics: `[metic_name]_(1w|2w|3w)`. The slack message contains an image and metric details (when CSV reporting is back in Kibana)
+Naming convention for metrics: `[metric_name]_(1w|2w|3w)`. The slack message contains an image and metric details (when CSV reporting is back in Kibana)
