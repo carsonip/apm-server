@@ -72,6 +72,7 @@ func NewAggregator(
 		aggregators.WithLogger(zapLogger),
 		aggregators.WithMeter(mp.Meter("aggregator")),
 		aggregators.WithTracer(tp.Tracer("aggregator")),
+		aggregators.WithInMemoryFS(true),
 	)
 
 	if err != nil {
