@@ -78,6 +78,8 @@ github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZx
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+github.com/carsonip/apm-aggregation v0.0.0-20230728175921-a42fd06fbc53 h1:LvO8cCcmaknegtJGNornyDUnxq3wHv//vxW+eVRZFeI=
+github.com/carsonip/apm-aggregation v0.0.0-20230728175921-a42fd06fbc53/go.mod h1:9TqNryLsTK31DwrkaYg/ee63G5Mx4i7MqZxqR4PonzY=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
@@ -150,8 +152,6 @@ github.com/eapache/go-xerial-snappy v0.0.0-20230111030713-bf00bc1b83b6/go.mod h1
 github.com/eapache/queue v1.1.0 h1:YOEu7KNc61ntiQlcEeUIoDTJ2o8mQznoNvUhiigpIqc=
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
 github.com/eknkc/amber v0.0.0-20171010120322-cdade1c07385/go.mod h1:0vRUJqYpeSZifjYj7uP3BG/gKcuzL9xWVV/Y+cK33KM=
-github.com/elastic/apm-aggregation v0.0.0-20230728123441-fe23835e0561 h1:xD7ZinjwXg1LdP5137spsP0H6FyYJQ4bCF2rexI0fL8=
-github.com/elastic/apm-aggregation v0.0.0-20230728123441-fe23835e0561/go.mod h1:9TqNryLsTK31DwrkaYg/ee63G5Mx4i7MqZxqR4PonzY=
 github.com/elastic/apm-data v0.1.1-0.20230728063148-1076ea8b4db0 h1:dJEhfgmABnNyC//PM/CDCEEMg5l6I+KjHGDR6o1WMx4=
 github.com/elastic/apm-data v0.1.1-0.20230728063148-1076ea8b4db0/go.mod h1:lMTMoCWNadiDJih/tLechuMTtumEeedtKJlBOYAv030=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20230727143857-7fd27bf1f6c4 h1:sICugAEku+oUCgX9p5UkZk0UtzM0yatddqz0ufEObmE=
