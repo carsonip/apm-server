@@ -105,7 +105,7 @@ type StorageConfig struct {
 	//
 	// Storage lives outside processor lifecycle and will not be closed when processor
 	// is closed
-	Storage *eventstorage.ShardedReadWriter
+	Storage eventstorage.IReadWriter
 
 	// StorageDir holds the directory in which event storage will be maintained.
 	StorageDir string
@@ -235,9 +235,9 @@ func (config DataStreamConfig) validate() error {
 }
 
 func (config StorageConfig) validate() error {
-	if config.DB == nil {
-		return errors.New("DB unspecified")
-	}
+	//if config.DB == nil {
+	//	return errors.New("DB unspecified")
+	//}
 	if config.Storage == nil {
 		return errors.New("Storage unspecified")
 	}

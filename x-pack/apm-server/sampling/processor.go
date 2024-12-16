@@ -625,7 +625,7 @@ const (
 
 // wrappedRW wraps configurable write options for global ShardedReadWriter
 type wrappedRW struct {
-	rw         *eventstorage.ShardedReadWriter
+	rw         eventstorage.IReadWriter
 	writerOpts eventstorage.WriterOpts
 }
 
@@ -634,7 +634,7 @@ type wrappedRW struct {
 // limit value greater than zero. The hard limit on storage is set to 90% of
 // the limit to account for delay in the size reporting by badger.
 // https://github.com/dgraph-io/badger/blob/82b00f27e3827022082225221ae05c03f0d37620/db.go#L1302-L1319.
-func newWrappedRW(rw *eventstorage.ShardedReadWriter, ttl time.Duration, limit int64) *wrappedRW {
+func newWrappedRW(rw eventstorage.IReadWriter, ttl time.Duration, limit int64) *wrappedRW {
 	if limit > 1 {
 		limit = int64(float64(limit) * storageLimitThreshold)
 	}

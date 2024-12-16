@@ -11,6 +11,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/elastic/elastic-agent-libs/paths"
+
 	"github.com/dgraph-io/badger/v4"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/sync/errgroup"
@@ -22,12 +24,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/paths"
 
 	"github.com/elastic/apm-data/model/modelpb"
 	"github.com/elastic/apm-data/model/modelprocessor"
 	"github.com/elastic/apm-server/internal/beatcmd"
 	"github.com/elastic/apm-server/internal/beater"
+	beaterconfig "github.com/elastic/apm-server/internal/beater/config"
 	"github.com/elastic/apm-server/x-pack/apm-server/sampling"
 	"github.com/elastic/apm-server/x-pack/apm-server/sampling/eventstorage"
 )
@@ -46,7 +48,7 @@ var (
 	badgerDB *badger.DB
 
 	storageMu sync.Mutex
-	storage   *eventstorage.ShardedReadWriter
+	storageRW eventstorage.IReadWriter
 
 	// samplerUUID is a UUID used to identify sampled trace ID documents
 	// published by this process.
@@ -118,11 +120,11 @@ func newTailSamplingProcessor(args beater.ServerParams) (*sampling.Processor, er
 	}
 
 	storageDir := paths.Resolve(paths.Data, tailSamplingStorageDir)
-	badgerDB, err = getBadgerDB(storageDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Badger database: %w", err)
-	}
-	readWriters := getStorage(badgerDB)
+	//badgerDB, err = getBadgerDB(storageDir)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to get Badger database: %w", err)
+	//}
+	readWriters := getStorage(tailSamplingConfig)
 
 	policies := make([]sampling.Policy, len(tailSamplingConfig.Policies))
 	for i, in := range tailSamplingConfig.Policies {
@@ -179,14 +181,17 @@ func getBadgerDB(storageDir string) (*badger.DB, error) {
 	return badgerDB, nil
 }
 
-func getStorage(db *badger.DB) *eventstorage.ShardedReadWriter {
+func getStorage(samplingConfig beaterconfig.TailSamplingConfig) eventstorage.IReadWriter {
 	storageMu.Lock()
 	defer storageMu.Unlock()
-	if storage == nil {
-		eventCodec := eventstorage.ProtobufCodec{}
-		storage = eventstorage.New(db, eventCodec).NewShardedReadWriter()
+	if storageRW == nil {
+		rw, err := eventstorage.NewTTLStorage(samplingConfig.TTL, eventstorage.ProtobufCodec{})
+		if err != nil {
+			panic(err) //FIXME
+		}
+		storageRW = rw.NewReadWriter()
 	}
-	return storage
+	return storageRW
 }
 
 // runServerWithProcessors runs the APM Server and the given list of processors.
@@ -262,8 +267,8 @@ func closeBadger() error {
 }
 
 func closeStorage() {
-	if storage != nil {
-		storage.Close()
+	if storageRW != nil {
+		storageRW.Close()
 	}
 }
 
