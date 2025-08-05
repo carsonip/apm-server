@@ -576,6 +576,127 @@ func TestRunManager_Reloader(t *testing.T) {
 	}
 }
 
+func TestRunManager_Reloader_panic(t *testing.T) {
+	// This test asserts that panic in runner is propagated immediately.
+	registry := reload.NewRegistry()
+
+	reloader, err := NewReloader(beat.Info{
+		Logger: logptest.NewTestingLogger(t, ""),
+	}, registry, func(p RunnerParams) (Runner, error) {
+		return runnerFunc(func(ctx context.Context) error {
+			revision, err := p.Config.Int("revision", -1)
+			require.NoError(t, err)
+			if revision == 2 {
+				panic("boom!")
+			}
+			return nil
+		}), nil
+	}, nil, nil, nil, beat.NewMonitoring())
+	require.NoError(t, err)
+
+	agentInfo := &proto.AgentInfo{
+		Id:       "elastic-agent-id",
+		Version:  version.VersionWithQualifier(),
+		Snapshot: true,
+	}
+	srv := integration.NewMockServer([]*proto.CheckinExpected{
+		{
+			AgentInfo: agentInfo,
+			Units: []*proto.UnitExpected{
+				{
+					Id:             "output-unit",
+					Type:           proto.UnitType_OUTPUT,
+					ConfigStateIdx: 1,
+					Config: &proto.UnitExpectedConfig{
+						Id:   "default",
+						Type: "elasticsearch",
+						Name: "elasticsearch",
+					},
+					State:    proto.State_HEALTHY,
+					LogLevel: proto.UnitLogLevel_INFO,
+				},
+				{
+					Id:             "input-unit-1",
+					Type:           proto.UnitType_INPUT,
+					ConfigStateIdx: 1,
+					Config: &proto.UnitExpectedConfig{
+						Id:   "elastic-apm",
+						Type: "apm",
+						Name: "Elastic APM",
+						Streams: []*proto.Stream{
+							{
+								Id: "elastic-apm",
+								Source: integration.RequireNewStruct(t, map[string]interface{}{
+									"revision": 1,
+								}),
+							},
+						},
+					},
+					State:    proto.State_HEALTHY,
+					LogLevel: proto.UnitLogLevel_INFO,
+				},
+			},
+			Features:    nil,
+			FeaturesIdx: 1,
+		},
+		{
+			AgentInfo: agentInfo,
+			Units: []*proto.UnitExpected{
+				{
+					Id:             "output-unit",
+					Type:           proto.UnitType_OUTPUT,
+					ConfigStateIdx: 1,
+					State:          proto.State_HEALTHY,
+					LogLevel:       proto.UnitLogLevel_INFO,
+				},
+				{
+					Id:             "elastic-apm",
+					Type:           proto.UnitType_INPUT,
+					ConfigStateIdx: 2,
+					Config: &proto.UnitExpectedConfig{
+						Id:   "elastic-apm",
+						Type: "apm",
+						Name: "Elastic APM",
+						Streams: []*proto.Stream{
+							{
+								Id: "elastic-apm",
+								Source: integration.RequireNewStruct(t, map[string]interface{}{
+									"revision": 2,
+								}),
+							},
+						},
+					},
+					State:    proto.State_HEALTHY,
+					LogLevel: proto.UnitLogLevel_INFO,
+				},
+			},
+			Features:    nil,
+			FeaturesIdx: 1,
+		},
+	},
+		nil,
+		10*time.Millisecond,
+	)
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	client := client.NewV2(
+		fmt.Sprintf(":%d", srv.Port),
+		"",
+		client.VersionInfo{},
+		client.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
+	manager, err := xpacklbmanagement.NewV2AgentManagerWithClient(&xpacklbmanagement.Config{
+		Enabled: true,
+	}, registry, client, xpacklbmanagement.WithChangeDebounce(0))
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	reloader.Run(context.Background())
+}
+
 func TestRunManager_Reloader_newRunnerError(t *testing.T) {
 	// This test asserts that any errors when creating runner inside reloader, e.g. config parsing error,
 	// will cause the unit to fail.
