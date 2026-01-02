@@ -10,9 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/errgroup"
 
@@ -46,6 +48,14 @@ type Processor struct {
 	stopMu   sync.Mutex
 	stopping chan struct{}
 	stopped  chan struct{}
+
+	samplingMus []sync.RWMutex
+}
+
+func (p *Processor) getShardID(traceID string) uint64 {
+	var h xxhash.Digest
+	_, _ = h.WriteString(traceID)
+	return h.Sum64() % uint64(len(p.samplingMus))
 }
 
 type eventMetrics struct {
@@ -74,6 +84,7 @@ func NewProcessor(config Config, logger *logp.Logger) (*Processor, error) {
 		eventStore:        config.Storage,
 		stopping:          make(chan struct{}),
 		stopped:           make(chan struct{}),
+		samplingMus:       make([]sync.RWMutex, runtime.GOMAXPROCS(0)),
 	}
 
 	p.eventMetrics.processed, _ = meter.Int64Counter("apm-server.sampling.tail.events.processed")
@@ -170,6 +181,10 @@ func (p *Processor) processTransaction(event *modelpb.APMEvent) (report, stored 
 		return true, false, nil
 	}
 
+	shardID := p.getShardID(event.Trace.Id)
+	p.samplingMus[shardID].RLock()
+	defer p.samplingMus[shardID].RUnlock()
+
 	traceSampled, err := p.eventStore.IsTraceSampled(event.Trace.Id)
 	switch err {
 	case nil:
@@ -230,6 +245,10 @@ sampling policies without service name specified.
 }
 
 func (p *Processor) processSpan(event *modelpb.APMEvent) (report, stored bool, _ error) {
+	shardID := p.getShardID(event.Trace.Id)
+	p.samplingMus[shardID].RLock()
+	defer p.samplingMus[shardID].RUnlock()
+
 	traceSampled, err := p.eventStore.IsTraceSampled(event.Trace.Id)
 	if err != nil {
 		if err == eventstorage.ErrNotFound {
@@ -443,11 +462,14 @@ func (p *Processor) Run() error {
 				}
 			}
 
+			shardID := p.getShardID(traceID)
+			p.samplingMus[shardID].Lock()
 			if err := p.eventStore.WriteTraceSampled(traceID, true); err != nil {
 				p.rateLimitedLogger.Warnf(
 					"received error writing sampled trace: %s", err,
 				)
 			}
+			p.samplingMus[shardID].Unlock()
 
 			events = events[:0]
 			if err := p.eventStore.ReadTraceEvents(traceID, &events); err != nil {

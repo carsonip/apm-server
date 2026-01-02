@@ -11,6 +11,8 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/elastic/apm-data/model/modelpb"
@@ -939,4 +942,106 @@ func waitFileModified(tb testing.TB, filename string, after time.Time) ([]byte, 
 
 func newUnlimitedReadWriter(sm *eventstorage.StorageManager) eventstorage.RW {
 	return sm.NewReadWriter(0, 0)
+}
+
+func TestPotentialRaceConditionConcurrent(t *testing.T) {
+	flushInterval := 1 * time.Second
+	tempdirConfig := newTempdirConfig(t)
+	tempdirConfig.Config.FlushInterval = flushInterval
+	tempdirConfig.Config.Policies = []sampling.Policy{
+		{SampleRate: 1.0},
+	}
+
+	var reportedMu sync.Mutex
+	reported := map[string]struct{}{}
+	tempdirConfig.Config.BatchProcessor = modelpb.ProcessBatchFunc(func(ctx context.Context, batch *modelpb.Batch) error {
+		reportedMu.Lock()
+		defer reportedMu.Unlock()
+		for _, b := range batch.Clone() {
+			reported[b.Transaction.Id] = struct{}{}
+		}
+		return nil
+	})
+
+	var lateArrivalsMu sync.Mutex
+	lateArrivals := map[string]struct{}{}
+	lateArrivalsProcessBatch := modelpb.ProcessBatchFunc(func(ctx context.Context, batch *modelpb.Batch) error {
+		lateArrivalsMu.Lock()
+		defer lateArrivalsMu.Unlock()
+		for _, b := range batch.Clone() {
+			lateArrivals[b.Transaction.Id] = struct{}{}
+		}
+		return nil
+	})
+
+	processor, err := sampling.NewProcessor(tempdirConfig.Config, logptest.NewTestingLogger(t, ""))
+	require.NoError(t, err)
+	go processor.Run()
+	defer processor.Stop(context.Background())
+
+	var count atomic.Int64
+	eg, ctx := errgroup.WithContext(context.Background())
+
+	traceId := "traceId"
+	c := count.Add(1)
+	batch := modelpb.Batch{{
+		Trace: &modelpb.Trace{Id: traceId},
+		Transaction: &modelpb.Transaction{
+			Type:    "type",
+			Id:      fmt.Sprintf("transaction%08d", c),
+			Sampled: true,
+		},
+	}}
+	if err := processor.ProcessBatch(ctx, &batch); err != nil {
+		panic(err)
+	}
+	for i := 0; i < 10; i++ {
+		eg.Go(func() error {
+			timer := time.NewTimer(flushInterval * 2)
+			defer timer.Stop()
+			for {
+				select {
+				case <-timer.C:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+
+				c := count.Add(1)
+
+				batch := modelpb.Batch{{
+					Trace: &modelpb.Trace{Id: traceId},
+					Transaction: &modelpb.Transaction{
+						Type:    "type",
+						Id:      fmt.Sprintf("transaction%08d", c),
+						Sampled: true,
+					},
+					ParentId: fmt.Sprintf("bar%08d", c),
+				}}
+				if err := processor.ProcessBatch(ctx, &batch); err != nil {
+					return err
+				}
+
+				if err := lateArrivalsProcessBatch.ProcessBatch(ctx, &batch); err != nil {
+					return err
+				}
+
+			}
+		})
+	}
+
+	require.NoError(t, eg.Wait())
+	require.NoError(t, processor.Stop(context.Background()))
+	require.NoError(t, tempdirConfig.Config.DB.Flush())
+	// reader := newUnlimitedReadWriter(tempdirConfig.Config.DB)
+
+	fmt.Println("count:", count.Load())
+
+	reportedMu.Lock()
+	lateArrivalsMu.Lock()
+	fmt.Printf("reported + late arrivals = %d + %d = %d\n", len(reported), len(lateArrivals), len(reported)+len(lateArrivals))
+	lateArrivalsMu.Unlock()
+	reportedMu.Unlock()
+
 }
